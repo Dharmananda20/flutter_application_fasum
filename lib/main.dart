@@ -27,7 +27,7 @@ class MyApp extends StatelessWidget {
       
       debugShowMaterialGrid: false,
 
-      // ===== THEME =====
+  
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -53,7 +53,7 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
       },
 
-      // ===== TAMBAHAN: FALLBACK ROUTE =====
+     
       onUnknownRoute: (settings) {
         return MaterialPageRoute(
           builder: (context) => const SignInScreen(),
