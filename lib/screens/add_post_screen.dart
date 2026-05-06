@@ -1,43 +1,14 @@
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home Screen'),
-      ),
-      body: const Center(
-        child: Text('Welcome to the Home Screen!'),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const AddPostScreen(),
-            ),
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
+import 'package:image_picker/image_picker.dart';
 
 class AddPostScreen extends StatefulWidget {
   const AddPostScreen({super.key});
@@ -47,15 +18,16 @@ class AddPostScreen extends StatefulWidget {
 }
 
 class _AddPostScreenState extends State<AddPostScreen> {
-
-  final ImagePicker _picker = ImagePicker();
   XFile? _pickedFile;
   Uint8List? _imageBytes;
   String? _base64Image;
   final TextEditingController _descriptionController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+  bool _isUploading = false;
   double? _latitude;
   double? _longitude;
-  bool _isUploading = false;
+
+  get _image => null;
 
   void _showImageSourceDialog() {
     showDialog(
@@ -105,16 +77,17 @@ class _AddPostScreenState extends State<AddPostScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
       }
     }
   }
 
   Future<void> _compressAndEncodeImage() async {
     if (_pickedFile == null || _imageBytes == null) return;
-
     if (kIsWeb) {
+      // flutter_image_compress tidak mendukung web, gunakan bytes langsung
       setState(() {
         _base64Image = base64Encode(_imageBytes!);
       });
@@ -123,9 +96,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
         File(_pickedFile!.path).path,
         quality: 50,
       );
-
       if (compressedImage == null) return;
-
       setState(() {
         _base64Image = base64Encode(compressedImage);
       });
@@ -135,12 +106,10 @@ class _AddPostScreenState extends State<AddPostScreen> {
   Future<void> _getLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
-
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       throw Exception('Location services are disabled.');
     }
-
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -149,12 +118,10 @@ class _AddPostScreenState extends State<AddPostScreen> {
         throw Exception('Location permissions are denied.');
       }
     }
-
     try {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: LocationSettings(accuracy: LocationAccuracy.high),
       ).timeout(const Duration(seconds: 10));
-
       setState(() {
         _latitude = position.latitude;
         _longitude = position.longitude;
@@ -170,29 +137,25 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
   Future<void> _submitPost() async {
     if (_base64Image == null || _descriptionController.text.isEmpty) return;
-
     setState(() => _isUploading = true);
-
     final now = DateTime.now().toIso8601String();
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     if (uid == null) {
       setState(() => _isUploading = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('User not found.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('User not found.')));
       return;
     }
-
     try {
       await _getLocation();
-
+      // Ambil nama lengkap dari koleksi users
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
           .get();
-
       final fullName = userDoc.data()?['fullName'] ?? 'Anonymous';
-
       await FirebaseFirestore.instance.collection('posts').add({
         'image': _base64Image,
         'description': _descriptionController.text,
@@ -201,30 +164,27 @@ class _AddPostScreenState extends State<AddPostScreen> {
         'latitude': _latitude,
         'longitude': _longitude,
         'fullName': fullName,
-        'userId': uid,
+        'userId': uid, // optional: jika ingin simpan UID juga,
       });
-
       if (!mounted) return;
       Navigator.pop(context);
     } catch (e) {
       debugPrint('Upload failed: $e');
       if (!mounted) return;
-
       setState(() => _isUploading = false);
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Failed to upload the post.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to upload the post.')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Post')),
+      appBar: AppBar(title: Text('Add Post')),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-
           GestureDetector(
             onTap: _showImageSourceDialog,
             child: Container(
@@ -234,65 +194,62 @@ class _AddPostScreenState extends State<AddPostScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: _imageBytes != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.memory(
-                          _imageBytes!,
-                          height: 250,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      )
-                    : const Center(
-                        child: Icon(
-                          Icons.add_a_photo,
-                          size: 50,
-                          color: Colors.grey,
-                        ),
-                      ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                hintText: 'Enter description...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: ElevatedButton(
-              onPressed: _isUploading ? null : _submitPost,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle: const TextStyle(fontSize: 16),
-                backgroundColor: Colors.green,
-              ),
-              child: _isUploading
-                  ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.white),
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.memory(
+                        _imageBytes!,
+                        height: 250,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
                       ),
                     )
-                  : const Text(
-                      'Post',
-                      style: TextStyle(color: Colors.white),
+                  : const Center(
+                      child: Icon(
+                        Icons.add_a_photo,
+                        size: 50,
+                        color: Colors.grey,
+                      ),
                     ),
             ),
           ),
 
+          const SizedBox(height: 16),
+
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              TextField(
+                controller: _descriptionController,
+                textCapitalization: TextCapitalization.sentences,
+                maxLines: 6,
+                decoration: const InputDecoration(
+                  hintText: 'Add a brief description...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Tombol kirim post
+          ElevatedButton(
+            onPressed: _isUploading ? null : _submitPost,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              textStyle: const TextStyle(fontSize: 16),
+              backgroundColor: Colors.green,
+            ),
+            child: _isUploading
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Text('Post', style: TextStyle(color: Colors.white)),
+          ),
         ],
       ),
     );

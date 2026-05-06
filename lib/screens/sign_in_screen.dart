@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_application_fasum/screens/home_screen.dart';
+import 'package:flutter_application_fasum/screens/Home_screen.dart';
 import 'package:flutter_application_fasum/screens/sign_up_screen.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -10,7 +10,6 @@ class SignInScreen extends StatefulWidget {
   @override
   State<SignInScreen> createState() => _SignInScreenState();
 }
-
 class _SignInScreenState extends State<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
