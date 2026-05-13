@@ -1,10 +1,9 @@
 import 'dart:convert';
 
-
 import 'package:flutter/material.dart';
+import 'package:flutter_application_fasum/screens/fullscren_image_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 
 class DetailScreen extends StatefulWidget {
   const DetailScreen({
@@ -19,7 +18,6 @@ class DetailScreen extends StatefulWidget {
     required this.heroTag,
   });
 
-
   final String imageBase64;
   final String description;
   final DateTime createdAt;
@@ -29,26 +27,31 @@ class DetailScreen extends StatefulWidget {
   final String category;
   final String heroTag;
 
-
   @override
   State<DetailScreen> createState() => _DetailScreenState();
 }
-
 
 class _DetailScreenState extends State<DetailScreen> {
   Future<void> openMap() async {
     final uri = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=${widget.latitude},${widget.longitude}',
     );
-    final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    final success = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
     if (!mounted) return;
+
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tidak bisa membuka Google Maps')),
+        const SnackBar(
+          content: Text('Tidak bisa membuka Google Maps'),
+        ),
       );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -56,20 +59,49 @@ class _DetailScreenState extends State<DetailScreen> {
       'dd MMMM yyyy, HH:mm',
     ).format(widget.createdAt);
 
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Detail Laporan')),
+      appBar: AppBar(
+        title: const Text('Detail Laporan'),
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Hero(
-            tag: widget.heroTag,
-            child: Image.memory(
-              base64Decode(widget.imageBase64),
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: 250,
-            ),
+          Stack(
+            children: [
+              Hero(
+                tag: widget.heroTag,
+                child: Image.memory(
+                  base64Decode(widget.imageBase64),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: 250,
+                ),
+              ),
+              Positioned(
+                top: 12,
+                right: 12,
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.fullscreen,
+                    color: Colors.white,
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => FullScreenImageScreen(
+                          imageBase64: widget.imageBase64,
+                        ),
+                      ),
+                    );
+                  },
+                  tooltip: 'Lihat gambar penuh',
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black45,
+                  ),
+                ),
+              ),
+            ],
           ),
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -79,10 +111,10 @@ class _DetailScreenState extends State<DetailScreen> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Kiri: Kategori & Waktu
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
@@ -112,14 +144,15 @@ class _DetailScreenState extends State<DetailScreen> {
                               const SizedBox(width: 4),
                               Text(
                                 createdAtFormatted,
-                                style: const TextStyle(fontSize: 14),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                ),
                               ),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    // Kanan: Icon map
                     IconButton(
                       onPressed: openMap,
                       icon: const Icon(
@@ -132,7 +165,10 @@ class _DetailScreenState extends State<DetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                Text(widget.description, style: const TextStyle(fontSize: 16)),
+                Text(
+                  widget.description,
+                  style: const TextStyle(fontSize: 16),
+                ),
               ],
             ),
           ),
